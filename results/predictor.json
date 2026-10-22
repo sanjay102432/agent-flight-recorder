@@ -1,0 +1,32 @@
+{
+  "bi": [
+    [
+      [
+        "fs.list",
+        "fs.read"
+      ],
+      {
+        "fs.write": 1
+      }
+    ]
+  ],
+  "predictor_id": "ngram-2",
+  "uni": [
+    [
+      [
+        "fs.list"
+      ],
+      {
+        "fs.read": 1
+      }
+    ],
+    [
+      [
+        "fs.read"
+      ],
+      {
+        "fs.write": 1
+      }
+    ]
+  ]
+}

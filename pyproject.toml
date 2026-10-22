@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-flight-recorder"
+version = "0.1.0"
+description = "Receipt-level trace recorder, deterministic replay and predictive prefetch for AI agents."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+authors = [{ name = "Sanjay" }]
+keywords = [
+    "agents", "tracing", "replay", "observability", "prefetch",
+    "determinism", "auditability", "llm",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.9",
+    "Topic :: Software Development :: Debuggers",
+    "Topic :: System :: Systems Administration",
+]
+# Zero runtime dependencies. Stdlib only, on purpose:
+# the recorder must run inside fragile agent environments.
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+afr = "afr.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["afr*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

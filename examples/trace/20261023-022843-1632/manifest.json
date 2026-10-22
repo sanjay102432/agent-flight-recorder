@@ -1,0 +1,19 @@
+{
+  "complete": true,
+  "created_utc": "2026-10-23T02:28:44",
+  "events": 24,
+  "resume_from": "7d8897dcdfa0e3c6",
+  "schema": "AFR-1",
+  "schema_version": 1,
+  "session_id": "20261023-022843-1632",
+  "summary": {
+    "counts": {
+      "events": 23,
+      "steps": 0
+    },
+    "ok": true,
+    "reason": "agent declared done",
+    "steps": 0
+  },
+  "trace_content_hash": "7d8897dcdfa0e3c6"
+}

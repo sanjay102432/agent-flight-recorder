@@ -1,0 +1,14 @@
+# Trace files are payloads, but local scratch state is not
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+trace_store/          # where the demo writes traces by default
+.afr/
+*.tmp
+
+# OS noise
+Thumbs.db
+.DS_Store

@@ -27,7 +27,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
 from .schema import (
-    RUN_END, RUN_START, STEP_END, STEP_START, LLM_REQUEST, LLM_RESPONSE,
+    RUN_END, RUN_START, STEP_END, STEP_START, LLM_RESPONSE,
     TOOL_INTENT, TOOL_RESULT,
     Event, text_sha256,
 )

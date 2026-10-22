@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from afr.schema import Event, SchemaError
+from afr.schema import SchemaError
 from afr.store import TraceStore
 
 

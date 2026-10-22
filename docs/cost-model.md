@@ -56,12 +56,12 @@ Field notes:
 
 ## Measured demo numbers (their honest scale)
 
-From the demo run (Oct 2026, this repo, i5-12450H laptop):
+From the demo run (Oct 2026, this repo, i5-12450H laptop, fresh workspaces):
 
 | Mode | hit_rate | saved_ms | wasted_ms | net_ms |
 | --- | --- | --- | --- | --- |
-| offline (self-trained planner trace) | 1.00 | 1.37 | 0.0 | 1.37 |
-| live (planner-trained, run on auditor trace) | 1.00 | 2.86 | 0.0 | 2.86 |
+| offline (self-trained planner trace) | 1.00 | 1.89 | 0.0 | 1.89 |
+| live (planner-trained, run on auditor trace) | 1.00 | 2.63 | 0.0 | 2.63 |
 
 Read these as *plumbing validation*, not as the headline: the demo agent
 makes 2–3 tool calls per turnout, so at most one prediction is possible

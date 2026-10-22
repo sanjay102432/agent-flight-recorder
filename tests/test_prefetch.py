@@ -7,8 +7,7 @@ from afr.prefetch import (
     NGramPredictor, PrefetchEngine, ShadowWorkspace, SpeculationRefused,
 )
 from afr.recorder import Recorder
-from afr.replay import extract_plan
-from afr.tools import READ_ONLY, WRITE, ToolRegistry, make_tools
+from afr.tools import make_tools
 from afr.demo_agent import DemoAgent, MockProvider, planner_script
 
 
@@ -146,7 +145,6 @@ def test_live_ledger_counts_real_waste(ws, tmp_path):
     DemoAgent(rec, provider).run("plan")
     events = store.read_events()
 
-    skip_size = engine_skip = None
     fresh = NGramPredictor()                       # knows nothing
     ledger = PrefetchEngine(fresh, registry, ws).evaluate(events)
     assert ledger["hits"] == 0

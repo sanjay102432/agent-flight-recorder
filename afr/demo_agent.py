@@ -24,11 +24,9 @@ The DemoAgent loop itself is deliberately braindead:
 
 from __future__ import annotations
 
-import json
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 from .recorder import Recorder, ToolExecutionError, parse_tool_call
-from .tools import ToolRegistry
 
 
 # ---------------------------------------------------------------- provider

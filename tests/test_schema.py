@@ -4,7 +4,7 @@ import json
 import pytest
 
 from afr.schema import (
-    RUN_END, RUN_START, TOOL_INTENT, TOOL_RESULT, RUN_END,
+    RUN_END, RUN_START, TOOL_RESULT,
     Event, SchemaError, read_trace, text_sha256, validate,
 )
 

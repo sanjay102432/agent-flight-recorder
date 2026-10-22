@@ -2,7 +2,6 @@
 import os
 
 from afr.replay import extract_plan, replay
-from afr.schema import TOOL_RESULT
 from afr.tools import make_tools
 
 

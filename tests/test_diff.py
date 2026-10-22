@@ -1,6 +1,4 @@
 """Session diffing: align on plan identity, then explain the drift."""
-import os
-
 from afr.diff import diff_sessions, digest_steps
 from afr.demo_agent import DemoAgent, MockProvider, auditor_script, planner_script
 from afr.recorder import Recorder

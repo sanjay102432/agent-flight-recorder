@@ -21,7 +21,7 @@ import difflib
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
-from .schema import EVENT_TYPES, Event, text_sha256
+from .schema import Event, text_sha256
 from .schema import (
     LLM_RESPONSE, STEP_START, TOOL_INTENT, TOOL_RESULT,
 )
@@ -48,7 +48,6 @@ class StepDigest:
 
 def digest_steps(events: List[Event]) -> List[StepDigest]:
     """Reduce an event list into a plain tool/result sequence of digests."""
-    digests: List[StepDigest] = []
     latest_response: Dict[int, str] = {}
     pending: Dict[int, StepDigest] = {}
 

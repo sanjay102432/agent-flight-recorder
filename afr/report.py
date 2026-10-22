@@ -29,8 +29,6 @@ from .schema import (
     TOOL_INTENT, TOOL_RESULT, Event,
 )
 
-T0_KEY = "t0_NS"
-
 _TEMPLATE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <title>AFR report - {session}</title>

@@ -1,8 +1,5 @@
-"""CLI end-to-end: every command from the README quickstart must work."""
 import json
 import os
-
-import pytest
 
 from afr.cli import main
 

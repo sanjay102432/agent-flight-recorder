@@ -23,7 +23,7 @@ even the recording harness cannot escape it by accident.
 from __future__ import annotations
 
 import os
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 READ_ONLY = "read-only"
 WRITE = "write"
@@ -62,8 +62,9 @@ class ToolRegistry:
     *different* safety class is a bug at registration time, not a race the
     recorder has to catch later."""
 
-    def __init__(self) -> None:
+    def __init__(self, root: Optional[str] = None) -> None:
         self.tools: Dict[str, ToolSpec] = {}
+        self.root = os.path.abspath(root) if root else None
 
     def register(self, name: str, fn: ToolFn, safety: str, blurb: str, arg_hint: str) -> None:
         if name in self.tools and self.tools[name].safety != safety:
@@ -171,7 +172,7 @@ def shell_run(workspace: str):
 
 def make_tools(workspace: str) -> "ToolRegistry":
     """The standard v1 toolset, each entry sandboxed to ``workspace``."""
-    reg = ToolRegistry()
+    reg = ToolRegistry(workspace)
     reg.register("fs.list", fs_list(workspace), READ_ONLY,
                  "List files in a folder relative to the workspace.", 'rel_dir="."')
     reg.register("fs.read", fs_read(workspace), READ_ONLY,

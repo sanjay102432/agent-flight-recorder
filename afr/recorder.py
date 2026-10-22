@@ -24,13 +24,9 @@ import os
 import platform
 import time
 import traceback
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
 from . import schema
-from .schema import (
-    ERROR, LLM_REQUEST, LLM_RESPONSE, RUN_START, STEP_END, STEP_START,
-    TOOL_INTENT, TOOL_RESULT,
-)
 from .store import TraceStore, _now_ns
 from .tools import ToolRegistry
 
@@ -67,6 +63,7 @@ class Recorder:
             "platform": platform.platform(),
             "python": platform.python_version(),
             "cwd": os.getcwd(),
+            "workspace": self.registry.root,
         }
         self.store.append(
             schema.RUN_START,

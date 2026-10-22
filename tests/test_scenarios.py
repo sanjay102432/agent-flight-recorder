@@ -1,15 +1,11 @@
 """Additive-only agent runner: `afr record` on scenario builder must show
 that the taxonomy is enforced in the ledger (a write prediction is
 refused, not executed)."""
-import json
-import os
-
-from afr.cli import main
 from afr.demo_agent import DemoAgent, MockProvider, builder_script
 from afr.prefetch import NGramPredictor, PrefetchEngine
 from afr.recorder import Recorder
 from afr.store import TraceStore
-from afr.tools import make_tools, READ_ONLY, WRITE
+from afr.tools import make_tools
 
 
 def test_builder_scenario_records_three_reads_one_write(ws, tmp_path):

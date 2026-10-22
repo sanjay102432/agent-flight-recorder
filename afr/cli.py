@@ -29,10 +29,9 @@ from .prefetch import PrefetchEngine, NGramPredictor
 from .recorder import Recorder
 from .replay import replay
 from .report import write_report
-from .schema import Event, read_events
+from .schema import Event
 from .store import TraceStore
 from .tools import make_tools
-
 
 def _resolve_session(store_root: str, ref: str) -> Optional[str]:
     """Accept exact ids or unambiguous prefixes."""
@@ -64,7 +63,7 @@ DEFAULT_STORE = os.path.join(os.getcwd(), "trace_store")
 
 
 def cmd_record(args: argparse.Namespace) -> int:
-    workspace = os.path.abspath(args.workspace)
+    workspace = os.path.abspath(args.workspace or "workspace")   # safe default
     store_root = args.store or DEFAULT_STORE
     build_workspace(workspace)
     registry = make_tools(workspace)
@@ -169,7 +168,10 @@ def cmd_prefetch(args: argparse.Namespace) -> int:
 def _first_workspace(events: List[Event]) -> str:
     for ev in events:
         if ev.type == "run.start":
-            return (ev.payload.get("env_snapshot", {}) or {}).get("cwd") or "."
+            snap = ev.payload.get("env_snapshot", {}) or {}
+            if snap.get("workspace"):
+                return snap["workspace"]
+            return snap.get("cwd") or "."
     return "."
 
 

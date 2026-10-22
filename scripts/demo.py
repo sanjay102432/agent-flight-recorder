@@ -11,10 +11,10 @@ or a diff -- deliberately no `trust me` sentences.
 
 from __future__ import annotations
 
-import json
 import os
 import sys
 import time
+from typing import List
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO)
@@ -53,6 +53,19 @@ def banner(title: str) -> None:
     print("=" * 72)
 
 
+def _fresh_slate(paths: List[str]) -> None:
+    """Wipe the demo's outputs so re-runs are idempotent. Deleting a trace
+    directory is safe BY DESIGN: traces are append-only files; this scrubs
+    the workspace, not the store semantics. Without this, a second demo
+    run leaves the examples dir with two extra sessions."""
+    import shutil
+
+    for p in paths:
+        if os.path.isdir(p):
+            shutil.rmtree(p)
+        os.makedirs(p, exist_ok=True)
+
+
 def main() -> int:
     import os
 
@@ -60,8 +73,10 @@ def main() -> int:
     store = os.path.join(REPO, "examples", "trace")
     wsA = os.path.join(REPO, "examples", "ws-run-a")
     wsB = os.path.join(REPO, "examples", "ws-run-b")
-    for root in (wsA, wsB):
-        os.makedirs(root, exist_ok=True)
+    results_dir = os.path.join(REPO, "results")
+
+    print("clearing previous demo outputs...")
+    _fresh_slate([store, results_dir, wsA, wsB])
 
     banner("1) record: the planner agent, twice (two workspaces, one system)")
     cmd_record(Args(store=store, workspace=wsA, scenario="planner"))

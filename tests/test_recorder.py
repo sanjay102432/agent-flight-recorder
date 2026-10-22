@@ -1,14 +1,11 @@
 """Recorder tests: intent/result pairing, receipts, error-as-fact."""
-import json
-
 import pytest
 
-from afr.recorder import Recorder, ToolExecutionError, parse_tool_call
+from afr.recorder import ToolExecutionError, parse_tool_call
 from afr.schema import (
-    ERROR, LLM_RESPONSE, LLM_REQUEST, RUN_END, RUN_START,
+    LLM_RESPONSE, LLM_REQUEST, RUN_END, RUN_START,
     TOOL_INTENT, TOOL_RESULT,
 )
-from afr.tools import READ_ONLY, WRITE, make_tools
 
 
 # -- the happy path ---------------------------------------------------------

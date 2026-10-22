@@ -22,6 +22,55 @@ are just programs that read them.
 
 ---
 
+## What · Where · How (the plain version)
+
+**What it is.** A black box for your AI agent — what airplanes have. When the
+agent crashes, misbehaves, or finishes weirdly, you press *replay* and watch
+exactly what happened, step by step, with proof attached to every claim.
+
+**Why it's useful — the pain it kills.** Today, when an agent does something
+wrong, you face this:
+
+- it edited a file and you don't know *which one, when, or why*
+- you ask "what were you doing?" and the log is 5,000 lines of text soup
+- you can't re-create the failure — it "just doesn't happen again"
+- a model update silently changes your agent's behavior, and nobody can say what changed
+
+The recorder turns all four into answerable questions — every decision
+(what the model saw, what it replied, what the tool touched, how long it
+took) is saved as a receipt in one append-only file. Afterwards you can:
+
+1. **Replay** a past run without touching anything — re-watch the CCTV
+2. **Compare** two runs and see exactly where the plan changed
+3. **Prove** the record wasn't edited — tamper-evident hash chain
+4. **Speed up** future runs — the recorder learns habits and pre-reads
+   what the model is about to ask for
+
+**Where to use it.**
+
+- you're *building* an agent (any code that calls a model + runs tools) → wrap it, record every run
+- an agent misbehaved in production → open the trace, find the exact step
+- compliance / auditing → "show me what the AI touched" — answer with receipts, not "I guess"
+- you changed the model or the prompt → diff the two recordings, check the plan
+- your agent loop feels slow → the prefetch ledger shows whether pre-reading saves real milliseconds
+
+**How it improves your work.**
+
+| Before | With the recorder |
+| --- | --- |
+| "I don't know what happened" | "step 3 fed the wrong file to the model" |
+| afternoon of print-statements | one replay, targeted fix |
+| agent's "I only read two files" → trust me | same claim → 5-second receipt check |
+| "is this agent safe to give file access?" | show the trace — a hiring-conversation ending |
+| a GitHub portfolio of todo apps | an instrument with evidence in it: tests, tamper-proof format, published ledger |
+
+Resume-ready summary:
+
+> *"I built the flight recorder AI agents are missing — every run is
+> replayable, auditable, and faster on the next run."*
+
+---
+
 ## Why "receipt" instead of "log"
 
 | | Log output | AFR trace |

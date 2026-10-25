@@ -158,12 +158,18 @@ Failure bookkeeping: refusals (the predictor guessed an unsafe tool) are
 recorded per evaluation, so "how often did the safety gate matter?" is a
 number, not an anecdote.
 
-### `afr/report.py` — the flight report (one HTML file, no server)
+### `afr/report.py` — the flight report, three forms, one digest
 
-- `_digest()` projects events into (a) timeline dots and (b) per-step
-  plan rows; both carry `eid`s so the UI cross-animates on click;
-- template is self-contained: no CDN, no fetch, no build step; the
-  payload is embedded JSON;
+- new `_assemble()` reduces the events to plain display facts once; the
+  terminal, markdown, and HTML renderers eat the same digest, so the
+  three forms cannot disagree;
+- `build_terminal_report()` — a plain-ASCII receipt table for the console
+  (outcome, per-step args/receipts/results, side effects, errors);
+- `build_markdown_report()` — the same facts as an `## At a glance`,
+  a step table with receipts, side effects, an error table, and the
+  verify/diff commands to re-check every claim;
+- `_digest()` + HTML template remain the self-contained browser report:
+  no CDN, no fetch, no build step; the payload is embedded JSON;
 - color mapping: LLM turns = blue lane; tool results colored by safety
   (`unsafe` class when safety ≠ read-only), errors red; plan rows list
   receipt kinds beneath each step.
@@ -171,7 +177,9 @@ number, not an anecdote.
 ### `afr/cli.py` — commands and identity plumbing
 
 `record`, `replay [--verify]`, `verify`, `list`, `prefetch
-[--live] [--train] [--out]`, `diff [--json]`, `view [-o] [--open]`.
+[--live] [--train] [--out]`, `diff [--json]`,
+`view [-o] [--html] [--open]` (default = terminal report on stdout +
+markdown file on disk; `-o path.html` falls through to the HTML report).
 Session references accept exact ids or unambiguous prefixes. `main()`
 maps command exit codes (0 ok, 1 verdict-was-negative/drift, 2 bad input)
 so shell scripts can branch on the forensic verdict.
@@ -198,6 +206,6 @@ so shell scripts can branch on the forensic verdict.
 | `test_replay.py` | recorded walk clean, verify drift bites (two honest drifts), unsafe skips visible |
 | `test_prefetch.py` | predictor math + persistence, shadow isolation (files vanish), refusal of write/unregistered, ledger math, serializable ledger |
 | `test_diff.py` | tool-name alignment, arg/result drift, similarity, kept-going |
-| `test_report.py` | self-contained HTML, parseable embedded JSON, unsafe tagging |
+| `test_report.py` | terminal + markdown + HTML reports from the trace alone (shared digest, stable on empty traces) |
 | `test_cli.py` | command matrix exit codes incl. tamper → non-zero |
 | `test_scenarios.py` | the builder scenario's read bias and the write refusal that follows |

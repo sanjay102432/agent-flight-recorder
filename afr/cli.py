@@ -1,15 +1,16 @@
 """Command line front door.
 
     afr record [WORKSPACE]              record the demo agent on a workspace
+    afr view SESSION                    flight report on the terminal + a .md file
     afr replay SESSION [--verify]       replay (or verify) a recorded session
     afr prefetch SESSION --workspace W  price prefetch against the trace
     afr diff SESSION_A SESSION_B        plan-diff two sessions
     afr list                            list sessions in the trace store
     afr verify SESSION                  integrity-check the trace file
-    afr view SESSION [-o report.html]   write / open the HTML report
 
 Identities: sessions are referenced by their id (directory name in
 trace_store/), which `afr list` prints in full. Prefixes work too.
+Every forensic command exits 0 on a clean verdict, non-zero otherwise.
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ from .demo_agent import (
 from .prefetch import PrefetchEngine, NGramPredictor
 from .recorder import Recorder
 from .replay import replay
-from .report import write_report
+from .report import build_terminal_report, write_markdown_report, write_report
 from .schema import Event
 from .store import TraceStore
 from .tools import make_tools
@@ -56,6 +57,11 @@ def _print_json(data: Dict[str, Any]) -> None:
     print(json.dumps(data, indent=2, sort_keys=True, ensure_ascii=True))
 
 
+def _sane(text: str) -> str:
+    """Strip braces so a human summary never breaks JSON-parsing consumers."""
+    return str(text).replace("{", "(").replace("}", ")")
+
+
 DEFAULT_STORE = os.path.join(os.getcwd(), "trace_store")
 
 
@@ -79,10 +85,16 @@ def cmd_record(args: argparse.Namespace) -> int:
     )
     agent = DemoAgent(recorder, provider)
     outcome = agent.run(args.task or f"scenario:{args.scenario}")
-    print(f"recorded session {store.session_id}")
+    sid = store.session_id
+    print(f"recorded session {sid}")
     print(f"  scenario {args.scenario}  ok={outcome['ok']}  steps={outcome['steps']}")
+    if outcome.get("final"):
+        print(f"  agent said: {_sane(outcome['final'].splitlines()[0][:120])}")
     print(f"  trace: {store.trace_path}")
-    print("  next:  afr list | afr replay " + store.session_id[:19] + "...")
+    print("  next steps:")
+    print(f"    python -m afr view    {sid}    # flight report on the terminal + a .md file")
+    print(f"    python -m afr replay  {sid}    # re-walk the plan without re-running it")
+    print(f"    python -m afr verify  {sid}    # tamper-evidence check")
     return 0 if outcome["ok"] else 1
 
 
@@ -102,8 +114,23 @@ def cmd_replay(args: argparse.Namespace) -> int:
         registry = None
     mode = "verify" if args.verify else "recorded"
     report = replay(events, registry=registry, mode=mode, workspace=workspace)
+    _print_replay_summary(report)
     _print_json(report.to_dict())
     return 0 if report.ok else 1
+
+
+def _print_replay_summary(report) -> None:
+    """Human-readable verdict lines, then the JSON block follows verbatim."""
+    print(f"replay {report.session_id}   (mode={report.mode})")
+    print(f"  steps {report.steps} | tool calls {report.tool_calls} | "
+          f"re-checked {report.verified_calls} | deviations {report.deviations}")
+    if report.ok:
+        print("  verdict: CLEAN - the recorded plan replays exactly")
+    else:
+        print(f"  verdict: DRIFT - {report.deviations} step(s) did not replay as recorded")
+    for note in report.notes:
+        print(f"  note: {_sane(note)}")
+    print()
 
 
 def cmd_verify(args: argparse.Namespace) -> int:
@@ -112,6 +139,16 @@ def cmd_verify(args: argparse.Namespace) -> int:
         print(f"no session matches {args.session!r}", file=sys.stderr)
         return 2
     verdict = TraceStore(args.store or DEFAULT_STORE, sid).verify_integrity()
+    print(f"verify {sid}")
+    print(f"  events {verdict['events']} | timestamps in order: {verdict['monotonic_ts']} "
+          f"| content hash matches manifest: {verdict['chain_ok']}")
+    if verdict["ok"] and verdict["complete"]:
+        print("  verdict: CLEAN - the trace file is intact as recorded")
+    elif verdict["ok"]:
+        print("  verdict: INTACT so far, but the session never closed (no run.end)")
+    else:
+        print("  verdict: TAMPERED - the file changed after the manifest recorded it")
+    print()
     _print_json(verdict)
     return 0 if verdict["ok"] else 1
 
@@ -199,11 +236,26 @@ def cmd_view(args: argparse.Namespace) -> int:
     if events is None:
         print(f"no session matches {args.session!r}", file=sys.stderr)
         return 2
-    out = args.output or os.path.join("results", f"report-{args.session[:19]}.html")
-    path = write_report(events, out, open_browser=args.open)
-    print(f"report written: {path}")
-    if args.open:
-        print("opened in your browser")
+    # -o report.html -> self-contained HTML (kept for CI scripts); default:
+    # terminal-form report on stdout + markdown (.md) file on disk
+    if args.output and args.output.lower().endswith(".html"):
+        path = write_report(events, args.output, open_browser=args.open)
+        print(f"report written: {path}")
+        if args.open:
+            print("opened in your browser")
+        return 0
+    trace_path = os.path.join(os.path.abspath(args.store or DEFAULT_STORE),
+                              events[0].session_id, "trace.jsonl")
+    out = args.output or os.path.join("results", f"report-{events[0].session_id}.md")
+    out = write_markdown_report(events, out, trace_path=trace_path)
+    print(build_terminal_report(events))
+    print(f"markdown report written: {out}")
+    if args.html or args.open:
+        html_path = os.path.splitext(out)[0] + ".html"
+        write_report(events, html_path, open_browser=args.open)
+        print(f"html report written:    {html_path}")
+        if args.open:
+            print("opened html in your browser")
     return 0
 
 
@@ -258,11 +310,14 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("--json", action="store_true")
     d.set_defaults(fn=cmd_diff)
 
-    vi = sub.add_parser("view", help="HTML report for a session")
+    vi = sub.add_parser("view", help="flight report: terminal summary + markdown .md file")
     store_arg(vi)
     vi.add_argument("session")
-    vi.add_argument("-o", "--output", default=None)
-    vi.add_argument("--open", action="store_true", help="also open in your browser")
+    vi.add_argument("-o", "--output", default=None,
+                    help="markdown report path (default results/report-<session>.md; "
+                         "ends with .html -> write the web report there instead)")
+    vi.add_argument("--html", action="store_true", help="also write the self-contained HTML report")
+    vi.add_argument("--open", action="store_true", help="also open the HTML report in your browser")
     vi.set_defaults(fn=cmd_view)
     return p
 

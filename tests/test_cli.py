@@ -112,3 +112,28 @@ def test_view_writes_report(tmp_path):
     out = str(tmp_path / "report.html")
     rc = main(["view", _first_dir(store), "--store", store, "-o", out])
     assert rc == 0 and os.path.exists(out)
+
+
+def test_view_writes_markdown_and_prints_terminal(tmp_path, capsys):
+    store = str(tmp_path / "store")
+    ws = str(tmp_path / "ws")
+    main(["record", ws, "--scenario", "planner", "--store", store])
+    sid = _first_dir(store)
+    out_md = str(tmp_path / "out" / "report.md")
+    rc = main(["view", sid, "--store", store, "-o", out_md])
+    assert rc == 0
+    term = capsys.readouterr().out
+    assert "AGENT FLIGHT REPORT" in term            # terminal form on stdout
+    body = open(out_md, encoding="utf-8").read()    # markdown file on disk
+    assert "## At a glance" in body
+    assert sid in body
+
+
+def test_view_writes_html_alongside_markdown(tmp_path):
+    store = str(tmp_path / "store")
+    main(["record", str(tmp_path / "ws"), "--scenario", "planner", "--store", store])
+    out_md = str(tmp_path / "report.md")
+    rc = main(["view", _first_dir(store), "--store", store, "-o", out_md, "--html"])
+    assert rc == 0
+    assert os.path.exists(out_md)
+    assert os.path.exists(str(tmp_path / "report.html"))

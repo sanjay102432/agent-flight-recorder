@@ -1,8 +1,29 @@
-"""HTML report: self-contained, valid JSON payload, no server needed."""
+"""HTML + markdown + terminal reports: self-contained, no server needed."""
 import json
 import re
 
-from afr.report import build_report, write_report
+import pytest
+
+from afr.demo_agent import DemoAgent, MockProvider, failing_script, build_workspace
+from afr.recorder import Recorder
+from afr.report import (
+    build_markdown_report, build_report, build_terminal_report, write_report,
+)
+from afr.store import TraceStore
+from afr.tools import make_tools
+
+
+@pytest.fixture
+def recorded_failure(tmp_path):
+    """A recorded session whose tool call fails on step 1 (ghost.txt)."""
+    ws = str(tmp_path / "ws")
+    build_workspace(ws)
+    store = TraceStore(str(tmp_path / "store"))
+    rec = Recorder(store, make_tools(ws),
+                   agent_meta={"name": "demo", "provider": "mock-scripted",
+                               "model": "mock-mini-1", "scenario": "failing"})
+    DemoAgent(rec, MockProvider(failing_script())).run("break")
+    return store, ws
 
 
 def test_report_embeds_parseable_trace(recorded_session, tmp_path):
@@ -44,3 +65,54 @@ def test_write_report_lands_on_disk(recorded_session, tmp_path):
 def test_empty_trace_report_is_stable():
     html = build_report([])
     assert "(empty)" in html
+
+
+def test_empty_trace_markdown_and_terminal_are_stable():
+    md = build_markdown_report([])
+    assert "empty trace" in md.lower()
+    term = build_terminal_report([])
+    assert "(empty trace" in term
+
+
+# -- markdown report ---------------------------------------------------------
+
+def test_markdown_report_shows_plan_receipts_and_commands(recorded_session):
+    store, _rec, _ws = recorded_session
+    md = build_markdown_report(store.read_events(), trace_path="trace.jsonl")
+    assert md.startswith("# Agent Flight Report")
+    assert "## At a glance" in md
+    assert "step by step" in md                   # the plan section header
+    assert "`fs.list` (read-only)" in md          # tool + safety class per step
+    assert "111 bytes" in md                      # receipt detail (fs.read)
+    assert "**created**" in md or "created" in md # fs.write side effect
+    assert "python -m afr verify" in md           # the check-it-yourself tail
+
+
+def test_markdown_report_of_failed_session_shows_the_error(recorded_failure):
+    store, _ws = recorded_failure
+    md = build_markdown_report(store.read_events(), trace_path="trace.jsonl")
+    assert "**FAILED**" in md
+    assert "FileNotFoundError" in md
+    assert "## Errors" in md
+
+
+# -- terminal report ---------------------------------------------------------
+
+def test_terminal_report_show_steps_and_receipts(recorded_session):
+    store, _rec, _ws = recorded_session
+    term = build_terminal_report(store.read_events())
+    assert "AGENT FLIGHT REPORT" in term
+    assert "step 1" in term and "step 3" in term
+    assert "fs.list" in term and "fs.write" in term
+    assert "SIDE EFFECTS" in term                 # aggregate is visible
+    assert "created" in term
+    assert "ERRORS              none" in term
+
+
+def test_terminal_report_of_failed_session_shows_the_error(recorded_failure):
+    store, _ws = recorded_failure
+    term = build_terminal_report(store.read_events())
+    assert "FAILED" in term
+    assert "[ERROR   ]" in term
+    assert "FileNotFoundError" in term
+    assert "ERRORS" in term

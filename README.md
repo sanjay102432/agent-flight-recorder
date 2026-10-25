@@ -2,12 +2,9 @@
 
 **Record your agent as facts, not logs — then replay it, diff it, verify it, and speed it up.**
 
-Receipt-level tracing for AI agents. One append-only file per session. Zero dependencies.
-No server. No SDK lock-in. Runs on a plain laptop — because that's who needed it first.
-
----
-
-## The 40-minute question
+Receipt-level tracing for AI agents. One append-only file per session.
+Zero dependencies. No server. No SDK lock-in. Runs on a plain laptop —
+because that's who needed it first.
 
 > Your agent ran for 40 minutes while you were away. It says it finished.
 > Someone asks: *which files did it touch, what did the model say at step 12,
@@ -15,206 +12,492 @@ No server. No SDK lock-in. Runs on a plain laptop — because that's who needed 
 >
 > Logs answer approximately. **A flight recorder answers with receipts.**
 
-That distinction is the whole project. Logs are opinions printed to stdout.
-A flight recorder stores the four measurable facts behind every loop step —
-and once you have the facts, replay, diff, audit, and *predictive prefetch*
-are just programs that read them.
-
 ---
 
-## What · Where · How (the plain version)
+## What's in the box
 
-**What it is.** A black box for your AI agent — what airplanes have. When the
-agent crashes, misbehaves, or finishes weirdly, you press *replay* and watch
-exactly what happened, step by step, with proof attached to every claim.
-
-**Why it's useful — the pain it kills.** Today, when an agent does something
-wrong, you face this:
-
-- it edited a file and you don't know *which one, when, or why*
-- you ask "what were you doing?" and the log is 5,000 lines of text soup
-- you can't re-create the failure — it "just doesn't happen again"
-- a model update silently changes your agent's behavior, and nobody can say what changed
-
-The recorder turns all four into answerable questions — every decision
-(what the model saw, what it replied, what the tool touched, how long it
-took) is saved as a receipt in one append-only file. Afterwards you can:
-
-1. **Replay** a past run without touching anything — re-watch the CCTV
-2. **Compare** two runs and see exactly where the plan changed
-3. **Prove** the record wasn't edited — tamper-evident hash chain
-4. **Speed up** future runs — the recorder learns habits and pre-reads
-   what the model is about to ask for
-
-**Where to use it.**
-
-- you're *building* an agent (any code that calls a model + runs tools) → wrap it, record every run
-- an agent misbehaved in production → open the trace, find the exact step
-- compliance / auditing → "show me what the AI touched" — answer with receipts, not "I guess"
-- you changed the model or the prompt → diff the two recordings, check the plan
-- your agent loop feels slow → the prefetch ledger shows whether pre-reading saves real milliseconds
-
-**How it improves your work.**
-
-| Before | With the recorder |
-| --- | --- |
-| "I don't know what happened" | "step 3 fed the wrong file to the model" |
-| afternoon of print-statements | one replay, targeted fix |
-| agent's "I only read two files" → trust me | same claim → 5-second receipt check |
-| "is this agent safe to give file access?" | show the trace — a hiring-conversation ending |
-| a GitHub portfolio of todo apps | an instrument with evidence in it: tests, tamper-proof format, published ledger |
-
-Resume-ready summary:
-
-> *"I built the flight recorder AI agents are missing — every run is
-> replayable, auditable, and faster on the next run."*
-
----
-
-## Why "receipt" instead of "log"
-
-| | Log output | AFR trace |
+| Capability | Command | What you get |
 | --- | --- | --- |
-| What it stores | narrative text | typed events: prompt · verbatim response · tool intent · tool receipt |
-| Reproducible replay? | no | **yes** — deterministic walk, zero I/O |
-| What a tool touched | guess from stdout | **the receipt**: paths, byte counts, `existed_before` |
-| Diff two runs | eyeball both outputs | **alignment table**: same plan? which step drifted? |
-| Prove the trace wasn't edited | no | **hash chain** per line + file digest in the manifest |
-| Make the next run faster | no | **prefetch ledger**: ms saved vs ms wasted, per tool class |
-
-The mental model: an airplane's flight recorder doesn't narrate the flight.
-It records control inputs, sensor values, and altitude at every tick — so
-afterwards you can *re-fly the sequence without the sky*.
+| Record | `afr record` | a replayable, hash-chained trace of one agent run |
+| Report | `afr view` | a human-readable flight report — **on the terminal + as a `.md` file** (+ optional HTML) |
+| Replay | `afr replay` | re-walk the recorded plan with zero I/O |
+| Verify | `afr verify` | prove the trace file wasn't edited after the fact |
+| Drift-check | `afr replay --verify` | re-run read-only steps against the live workspace; fail if results differ |
+| Diff | `afr diff` | align two runs and show exactly where the plan changed |
+| Prefetch | `afr prefetch` | an honest cost ledger: ms saved vs ms wasted for anticipatory pre-reading |
 
 ---
 
-## 60-second quickstart (fully offline)
+## How to use it — from zero to a full flight report
+
+Everything below runs **fully offline**: the demo agent uses a scripted
+mock model, so no API keys and no network are needed. It takes about
+two minutes.
+
+### Step 0 — one-time setup
+
+Requirements: **Python 3.9+** and nothing else (stdlib only — no pip install needed).
 
 ```powershell
-# clone, then from the repo root:
-python -m pytest tests                     # 73 tests, ~30 s
-python scripts/demo.py                     # 8-step guided tour, ~5 s
+git clone <this-repo>
+cd agent-flight-recorder
+python -m pytest tests          # sanity check: 80 tests should pass in ~30 s
 ```
 
-The tour writes `examples/report-<session>.html` — **open it in a browser.**
-One self-contained file: turn-by-turn timeline, the agent's plan with every
-receipt, and the raw events of whatever you click. No server, no CDN, no build step.
+All commands work either as `python -m afr ...` (no install) or as
+`afr ...` (after `pip install -e .` if you installed the package).
 
-Then fly an agent for yourself:
+### Step 1 — Record an agent (one command)
 
 ```powershell
-python -m afr record my_ws --scenario planner   # planner | auditor | builder | failing
-python -m afr list
-python -m afr replay <session-id>
-python -m afr replay <session-id> --verify --workspace my_ws
-python -m afr verify  <session-id>
-python -m afr prefetch <session-id> --workspace my_ws --live
-python -m afr diff <session-a> <session-b>
-python -m afr view  <session-id> --open
+python -m afr record my_ws --scenario planner
 ```
 
-Session ids are directory names like `20261023-022843-1632`; prefixes are
-accepted when unambiguous. Commands exit `0` on clean verdicts and non-zero
-when a forensic check fails — so traces slot into CI.
+`my_ws` is a tiny sandbox the recorder seeds with two files
+(`notes.txt`, `changelog.md`); the demo agent then *works in it*. The
+`planner` scenario is a scripted "model" that behaves like a real
+agent: it lists the folder, reads the notes, writes a `PLAN.md`, and
+says DONE. Real output:
+
+```
+recorded session 20261025-111404-a00f
+  scenario planner  ok=True  steps=4
+  agent said: DONE
+  trace: D:\...\agent-flight-recorder\trace_store\20261025-111404-a00f\trace.jsonl
+  next steps:
+    python -m afr view    20261025-111404-a00f    # flight report on the terminal + a .md file
+    python -m afr replay  20261025-111404-a00f    # re-walk the plan without re-running it
+    python -m afr verify  20261025-111404-a00f    # tamper-evidence check
+```
+
+> **Your session id will differ** — it looks like `20261026-103012-9c1a`.
+> Copy the one *your* command prints and use it below (a short prefix,
+> like `20261025-111404`, works too, as long as it's unambiguous).
+
+On disk you now have:
+
+```
+trace_store/
+└── 20261025-111404-a00f/
+    ├── trace.jsonl      24 JSON events, one per line, hash-chained
+    └── manifest.json    content digest + summary (the tamper-evidence anchor)
+```
+
+Two more ready-made scenarios: `python -m afr record my_ws --scenario auditor`
+(reads only), `--scenario failing` (intends to read a file that does not
+exist — shows how errors are recorded), and `--scenario builder`
+(three reads + one write).
+
+### Step 2 — Read the flight report (the main artifact)
+
+```powershell
+python -m afr view 20261025-111404-a00f
+```
+
+This prints the **terminal report** and writes the **markdown report**
+to `results\report-20261025-111404-a00f.md`. Real output:
+
+```
+==========================================================================
+ AGENT FLIGHT REPORT   session 20261025-111404-a00f
+==========================================================================
+ agent      demo   (mock-scripted / mock-mini-1)   scenario: planner
+ recorded   2026-10-25T11:14:04   (wall time 0.55 s)
+ workspace  D:\...\agent-flight-recorder\my_ws
+ outcome    OK   --  "agent declared done"
+ trace      24 events, closed cleanly (run.end present)
+--------------------------------------------------------------------------
+ THE PLAN (what actually happened, with the receipts)
+--------------------------------------------------------------------------
+ step 1  [OK      ] fs.list   (read-only, 0.8 ms)
+             args     { rel_dir=. }
+             touched  read 2 entries: .\changelog.md, .\notes.txt
+             result   changelog.md\nnotes.txt
+ step 2  [OK      ] fs.read   (read-only, 6.9 ms)
+             args     { rel_path=notes.txt }
+             touched  read notes.txt (111 bytes)
+             result   q3 dates: release candidate on 14 Aug, retro on 21 Au...
+ step 3  [WRITE   ] fs.write   (write, 1.1 ms)
+             args     { rel_path=PLAN.md; text=# Plan\n- read notes\n- summari...
+             touched  created PLAN.md (44 bytes)
+             result   wrote 44 chars to PLAN.md
+ step 4  [DONE]     no tool call -- model reply: 'DONE'
+--------------------------------------------------------------------------
+ SIDE EFFECTS
+   read        .\changelog.md, .\notes.txt, notes.txt
+   created     PLAN.md (44 bytes)
+--------------------------------------------------------------------------
+ ERRORS              none
+ TOOL TIME           8.74 ms across 3 calls   |   llm turns 4
+==========================================================================
+ check it:  afr verify  20261025-111404-a00f    # tamper-evidence
+            afr diff <other-id> 20261025-111404-a00f    # compare two runs
+==========================================================================
+markdown report written: D:\...\results\report-20261025-111404-a00f.md
+```
+
+**How to read it — every line is a fact from the trace:**
+
+- the **header block** is the who/when/where: agent name, model, workspace;
+- `[OK]`, `[WRITE]`, `[ERROR]` are the tool's **safety class** and result,
+  so unsafe traffic is visible at a glance;
+- **touched** is the receipt — what the tool *physically did* (files read,
+  bytes written, `created` vs `overwrote`), not just what it claimed;
+- **result** is what the tool returned (truncated to one line);
+- **SIDE EFFECTS** aggregates the whole run: everything read, everything
+  written, shell commands fired;
+- **ERRORS** and **TOOL TIME** close the report; the bottom lines hand you
+  the exact commands to double-check the report's own claims.
+
+Want the page version too?
+
+```powershell
+python -m afr view 20261025-111404-a00f --html    # + report-....html (next to the .md)
+python -m afr view 20261025-111404-a00f --open    # ...and open it in your browser
+```
+
+### Step 3 — What the markdown report looks like
+
+The `.md` file is the same facts, formatted for GitHub, PRs, and email.
+Here is the committed example `examples/report-20261025-111756-5911.md`
+(shortened — read the file itself for the full one):
+
+```markdown
+# Agent Flight Report -- `20261025-111756-5911`
+
+## At a glance
+
+| What | Value |
+| --- | --- |
+| Agent | `demo` -- `mock-scripted` / `mock-mini-1`, scenario `planner` |
+| Recorded | 2026-10-25T11:17:56 (wall time 0.47 s) |
+| Workspace | `...\examples\ws-run-a` |
+| Outcome | **OK** -- "agent declared done" (4 steps, 3 tool calls) |
+| Integrity | closed cleanly -- run.start + run.end present (24 events) |
+| Trace file | `...\examples\trace\20261025-111756-5911\trace.jsonl` |
+
+## What the agent did, step by step
+
+| Step | Tool (safety class) | Call arguments | Receipt | Result | Took | Verdict |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | `fs.list` (read-only) | { rel_dir=. } | read 2 entries: .\changelog.md, .\notes.txt | `changelog.md notes.txt` | 0.4 ms | OK |
+| 2 | `fs.read` (read-only) | { rel_path=notes.txt } | read notes.txt (111 bytes) | `q3 dates: ...` | 4.6 ms | OK |
+| 3 | `fs.write` (write) | { rel_path=PLAN.md; ... } | created PLAN.md (44 bytes) | `wrote 44 chars to PLAN.md` | 1.1 ms | WRITE |
+| 4 | -- | -- | -- | model replied `DONE` | -- | DONE |
+
+## Side effects on the workspace
+
+- **created** `PLAN.md` (44 bytes)
+- read: `.\changelog.md`, `.\notes.txt`, `notes.txt`
+
+## How to check this yourself
+
+- tamper check: `python -m afr verify 20261025-111756-5911`
+- re-walk the plan: `python -m afr replay 20261025-111756-5911`
+```
+
+### Step 4 — Replay the run (zero I/O)
+
+```powershell
+python -m afr replay 20261025-111404
+```
+
+Rebuilds the recorded plan without calling a model or running a tool:
+
+```
+replay 20261025-111404-a00f   (mode=recorded)
+  steps 4 | tool calls 3 | re-checked 0 | deviations 0
+  verdict: CLEAN - the recorded plan replays exactly
+
+{ ...full replay report as JSON ... }
+```
+
+The human verdict line is above; the JSON below is the machine-readable
+same thing (feed it to a script; its details: which step, which tool,
+which args, what came back).
+
+### Step 5 — Prove the record wasn't tampered with
+
+```powershell
+python -m afr verify 20261025-111404
+```
+
+```
+verify 20261025-111404-a00f
+  events 24 | timestamps in order: True | content hash matches manifest: True
+  verdict: CLEAN - the trace file is intact as recorded
+```
+
+Three checks: events are monotonic in time, the file's content digest
+matches the one in the manifest (out-of-band), and the session closed
+cleanly. To see a failure first-hand, append a junk line to `trace.jsonl`
+and run it again — the verdict flips to `TAMPERED` and the CLI exits 1.
+
+### Step 6 — Check the old claims against your workspace *today*
+
+Verify mode re-executes only **read-only** tools and compares the
+answers to what was recorded:
+
+```powershell
+python -m afr replay 20261025-111404 --verify --workspace my_ws
+```
+
+```
+replay 20261025-111404-a00f   (mode=verify)
+  steps 4 | tool calls 3 | re-checked 1 | deviations 1
+  verdict: DRIFT - 1 step(s) did not replay as recorded
+  note: step 1: fs.list result drifted recorded='changelog.md\nnotes.txt' now='PLAN.md\nchangelog.md\nnotes.txt'
+```
+
+That drift is *correct*: in Step 1 the agent itself created `PLAN.md`,
+and now the folder listing includes it — `fs.list` returns one more entry,
+so the trace's step 1 no longer holds. Writes are never re-executed
+(`note: fs.write is write; skipped verification by policy`). This is the
+command that answers *can I still trust that recorded result?* — and it
+exits non-zero, so you can fail a CI job on any drift.
+
+### Step 7 — Does prefetch pay for *this* trace? (the cost ledger)
+
+The predictor learns tool habits from the trace and grades itself with
+real measured milliseconds:
+
+```powershell
+python -m afr prefetch 20261025-111404 --workspace my_ws
+```
+
+```json
+{
+  "mode": "offline",
+  "hit_rate": 1.0,
+  "hits": 1,
+  "misses": 0,
+  "saved_ms": 2.82,
+  "wasted_ms": 0.0,
+  "net_ms": 2.82,
+  "per_tool": { "fs.read": { "hit": 1.0, "miss": 0.0,
+                             "saved_ms": 2.82, "wasted_ms": 0.0 } }
+}
+```
+
+How to read each field:
+
+| Field | Meaning |
+| --- | --- |
+| `hits` / `misses` | the predictor guessed the next tool correctly / not |
+| `saved_ms` | real recorded latency of the call the agent actually made, on hits only |
+| `wasted_ms` | cost of *wrong* speculations (offline: 0 by definition; with `--live` it shadow-runs misses and reports the honest number) |
+| `net_ms` | saved − wasted: the only number that decides whether prefetch pays on your workload |
+
+```powershell
+python -m afr prefetch 20261025-111404 --workspace my_ws --live   # honest wasted_ms, shadow-executed
+```
+
+Writes and network are structurally refused — see the next sections.
+
+### Step 8 — Diff two runs (what changed between them)
+
+Record a second, different agent on the **same workspace**, then align:
+
+```powershell
+python -m afr record my_ws --scenario auditor
+python -m afr diff 20261025-111404-a00f 20261025-111405-c13a
+```
+
+```
+diff 20261025-111404-a00f  vs  20261025-111405-c13a
+plan similarity 67%  (2 aligned steps)
+  result drift step 1 vs 1
+```
+
+Reading it: both runs started the same (list the folder), then the
+planner diverged (read more, wrote a plan). `result drift` pinpoints
+the step where the *same tool with the same args returned different
+data* — precisely the question "what moved under my agent?".
+
+### Step 9 — What a failed run looks like
+
+```powershell
+python -m afr record my_ws_fail --scenario failing    # exits with code 1 on purpose
+python -m afr view 20261025-111010-7e73
+```
+
+```
+ outcome    FAILED  --  "tool 'fs.read' failed"
+ trace      8 events, closed cleanly (run.end present)
+--------------------------------------------------------------------------
+ THE PLAN (what actually happened, with the receipts)
+--------------------------------------------------------------------------
+ step 1  [ERROR   ] fs.read   (read-only, 0.4 ms)
+             args     { rel_path=ghost.txt }
+             error    FileNotFoundError: no such file: ghost.txt
+--------------------------------------------------------------------------
+ ERRORS
+   step 1  tool error (fs.read): FileNotFoundError: no such file: ghost.txt
+```
+
+The failure is recorded as a fact with an exception name and the exact
+args that caused it — not as a stack trace soup.
+
+### The two-minute cheat sheet
+
+```powershell
+python -m afr record my_ws --scenario planner        # record (planner|auditor|builder|failing)
+python -m afr list                                   # all sessions: id, completeness, agent
+python -m afr view    <id>                           # flight report -- terminal + .md file
+python -m afr view    <id> --html                    # + self-contained .html for the browser
+python -m afr replay  <id>                           # re-walk the plan (no I/O)
+python -m afr replay  <id> --verify --workspace W    # re-run read-only steps, detect drift
+python -m afr verify  <id>                           # tamper-evidence check
+python -m afr prefetch <id> --workspace W            # prefetch cost ledger (add --live)
+python -m afr diff    <idA> <idB>                    # plan-diff two runs
+```
+
+Exit codes: **0** clean verdict · **1** forensic failure (drift, tamper,
+failed run) · **2** bad input (unknown session, missing flag argument) —
+so the CLI slots straight into CI.
 
 ---
 
-## Recording *your* agent (3 lines of integration)
+## How to test it
 
-AFR doesn't own your loop. It sells you two recording seams:
+The test suite needs **no pytest plugins, no network, no API keys** — every
+fixture records into a disposable `tmp_path` directory. Three ways to test,
+fastest first:
+
+### 1. Run everything (~30 s)
+
+```powershell
+python -m pytest tests
+```
+
+Expected last line:
+
+```
+80 passed in ~30s
+```
+
+(If you haven't, install the dev extra once: `pip install -e ".[dev]"` —
+it pulls in only pytest. Or run `python -m pytest` directly; same thing.)
+
+### 2. Run one area, or one single test
+
+```powershell
+python -m pytest tests/test_report.py -q          # one file
+python -m pytest tests/test_prefetch.py -q        # safety gate + ledger
+python -m pytest tests/test_replay.py::test_verify_flags_workspace_drift -v   # literally one test
+```
+
+What each file pins down:
+
+| Test file | What it proves | # tests |
+| --- | --- | --- |
+| `tests/test_schema.py` | event envelope validation, hash linkage AFR-1 contract | 13 |
+| `tests/test_store.py` | append-only JSONL store, manifest, reopen, chain detects edits | 8 |
+| `tests/test_recorder.py` | the two recording seams (`llm`, `tool_call`) and receipts | 10 |
+| `tests/test_replay.py` | deterministic walker + verify mode drift detection | 6 |
+| `tests/test_prefetch.py` | predictor, shadow-safety gate (refuses writes!), cost ledger | 14 |
+| `tests/test_diff.py` | plan alignment, arg/result drift decomposition | 5 |
+| `tests/test_report.py` | terminal + markdown + HTML reports from trace alone | 10 |
+| `tests/test_cli.py` | every command's exit codes and human-readable output | 12 |
+| `tests/test_scenarios.py` | the four demo agent storylines run and close cleanly | 2 |
+| | **total** | **80** |
+
+### 3. The 8-step guided tour (~5 s)
+
+```powershell
+python scripts/demo.py
+```
+
+Records two sessions into `examples/trace/`, replays them, verifies
+integrity, prices prefetch offline and live, diffs the two plans, and
+writes the flight report as `examples/report-<session>.md` **and**
+`.html`. It's idempotent — it wipes and recreates its own example
+outputs, so run it as often as you like.
+
+Fingers-on-keyboard checklist after editing any code:
+
+```powershell
+python -m pytest tests                       # the suite
+python scripts/demo.py                       # the tour, end to end
+python -m afr record my_ws --scenario failing; echo $LASTEXITCODE   # must be 1
+python -m afr view  <that-session-id>        # reports must render
+```
+
+---
+
+## Recording *your* agent (the integration contract)
+
+AFR doesn't own your loop. It sells you two recording seams, 3 lines of
+integration:
 
 ```python
 from afr import Recorder, TraceStore, make_tools
 
 store = TraceStore("./trace_store")                    # one session = one directory
-rec   = Recorder(store, make_tools("./workspace"),      # tools registered + sandboxed
+rec   = Recorder(store, make_tools("./my_project"),    # tools registered + sandboxed
                  agent_meta={"name": "my-agent", "provider": "openai", "model": "gpt-4o"})
 
-# seam 1: the model call — fn is ANY prompt->text callable
-text = rec.llm(my_llm_function, step=step, prompt=prompt)
-
-# seam 2: the tool call — intent, receipt, result, all on disk instantly
-result, raw, ok, receipt = rec.tool_call(step, "fs.read", {"rel_path": "notes.txt"})
+rec.open_run()
+for step in range(1, N):
+    rec.start_step(step)
+    # seam 1: the model call -- fn is ANY prompt->text callable
+    text = rec.llm(my_llm_function, step=step, prompt=prompt)
+    # seam 2: the tool call -- intent, receipt, result, all on disk instantly
+    result, raw, ok, receipt = rec.tool_call(step, "fs.read", {"rel_path": "notes.txt"})
+    rec.end_step(step, status="ok")
+rec.close_run(ok=True, reason="done")
 ```
 
 `my_llm_function` can hit a real provider, a local llama.cpp server, or a
 human. **The recorder never calls out** — that independence is what makes
-every trace provider-neutral.
+every trace provider-neutral: the same file format whether the model is
+GPT, GLM, or a colleague typing into a terminal.
 
----
+`make_tools()` gives you the standard sandboxed set (`fs.list`, `fs.read`,
+`fs.write`, `shell`) rooted at your workspace, or register your own:
 
-## Use cases — who reaches for this and when
+```python
+reg = make_tools("./my_project")
+reg.register("db.query", my_query_fn, safety="network",
+             blurb="query the metrics DB", arg_hint="sql='...'")
 
-**1 · Debugging the run you can't reproduce.**
-The trace is the replayable unit. `afr replay` rebuilds the step-by-step
-plan (tool, args, result, receipt) without a GLM call, so you can walk a
-*past* failure on a *presentation-room laptop*.
+```
 
-**2 · Trust review before authorizing tools.**
-Every write records `existed_before`, byte counts, touched paths. Every
-shell records cwd + command + returncode. You audit *evidence*, not vibes.
+The `safety` class you declare is a *contract*: `read-only`/`pure` tools
+may be speculatively pre-run by prefetch inside a throwaway copy of the
+workspace; `write`/`network`/`dangerous` never are — there is no override
+flag, by design.
 
-**3 · Model-version diffing.**
-Record run A with model X, run B with model Y. `afr diff` aligns the plans
-and reports: which steps matched, where args drifted, where results changed,
-where one session kept working while the other stopped. This is the answer
-to "what changed when the provider redeployed" — asked after every outage.
+### What every recorded event contains
 
-**4 · Trace-CI for agents.**
-Because commands exit non-zero on drift, you can assert: *this agent's plan
-must replay clean*, *this financial-tool plan may not change shape* — the
-reverse of prompt-fiddling CI chaos.
+| Event | Records |
+| --- | --- |
+| `run.start` / `run.end` | agent identity, environment snapshot, final outcome + reason |
+| `llm.request` / `llm.response` | verbatim prompt and answer (hashed), provider, model, token estimate, duration |
+| `tool.intent` | the tool the agent said it would call, exact args, safety class |
+| `tool.result` | what actually ran: receipt (files touched, `existed_before`, byte counts), result + its hash, duration, ok |
+| `error` | anything that interrupted the loop |
 
-**5 · Free speed: predictive prefetch.**
-The engine predicts the next tool call from recorded traces' n-grams
-(microsecond decision cost), speculatively runs only *read-only* tools in a
-throwaway copy of the workspace, and publishes a cost ledger:
+### On-disk format (boring on purpose — so you can `grep` it)
 
 ```json
-{"mode": "live", "hits": 1, "misses": 0, "hit_rate": 1.0,
- "saved_ms": 2.63, "wasted_ms": 0.0, "net_ms": 2.63,
- "per_tool": {"fs.read": {"hit": 1, "saved_ms": 2.63}}}
+{"type":"tool.result","ts_ns":1769138733123000000,"eid":"e000009",
+ "payload":{"step":2,"tool":"fs.read","args":{"rel_path":"notes.txt"},
+  "receipt":{"kind":"fs_read","read":["notes.txt"],"n_bytes":111},
+  "result":"q3 dates...","result_sha":"9f8b23c91a04c7d2",
+  "duration_ns":213900,"ok":true}}
 ```
 
-On this repo's tiny demo agent, a hit saves ~2–3 ms per call. On real
-agents (20–200 tool calls per loop, slow tools per call), the same
-accounting shows whether prefetch pays — only when its numbers do.
+```
+Select-String '"ok": false' trace_store\*\trace.jsonl   # Windows PowerShell
+grep '"ok": false' trace_store/*/trace.jsonl            # bash / git bash
+```
 
-**6 · Kid-simple corpus contribution.**
-Every recorded trace is training data for the predictor (and, one day,
-for playback-based agent benchmarks). Record once; teach all future runs.
+Any reader you write is ten lines. That portability is a *feature*.
 
 ---
 
-## Architecture at a glance
-
-```
- your agent loop (any code, any provider)
-        │ prompt                       tool call
-        ▼                                ▼
- ┌──────────────┐              ┌──────────────────┐
- │ Recorder.llm │              │ Recorder.tool_call│
- └──────┬───────┘              └────────┬─────────┘
-        │ llm.request + llm.response    │ tool.intent (args + safety class)
-        │   (verbatim facts)            │ tool.result (receipt + duration)
-        └──────────────┬────────────────┘
-                       ▼
-              TraceStore  ─ trace.jsonl   (append-only, per-line hash chain)
-                          └ manifest.json (digest, completeness, summary)
-                                │
-        ┌───────────────────────┼──────────────────────────┐
-        ▼                       ▼                          ▼
-   replay.py               diff.py                   prefetch.py
- "re-fly w/o the sky"    align 2 plans,            NGramPredictor →
- verify mode: re-run      decompose arg/         ShadowWorkspace copy →
- read-only steps          result drift           cost ledger (hits/misses)
-        │                       │                          │
-        └───────────────────────┼──────────────────────────┘
-                                ▼
-                       report.py → one HTML file
-```
-
-### The safety taxonomy (the load-bearing wall)
+## The safety taxonomy (the load-bearing wall)
 
 Prefetch is safe *by construction*, not by promise:
 
@@ -229,41 +512,11 @@ Prefetch is safe *by construction*, not by promise:
 The gate is structural: the allowlist is frozen at engine construction
 from the taxonomy; `speculate()` re-checks the class at call time; the
 shadow registry is minted *inside a copied workspace* and refuses to run
-if any tool's class disagrees with the live registry. And shadow state is
-taken at prediction time — the exact state the real call would have seen —
-so a "right guess on wrong state" is impossible. Try breaking it:
+if any tool's class disagrees with the live registry. Try breaking it:
 `tests/test_prefetch.py::test_engine_refuses_to_speculate_writes` asserts
 the file **does not exist** after the attempted speculation.
 
-### On-disk format (boring on purpose — so you can `grep` it)
-
-```
-trace_store/20261023-022843-1632/
-├── trace.jsonl      one JSON event per line, hash-chained
-└── manifest.json    digest + completeness flag + run summary
-```
-
-```json
-{"type":"tool.result","ts_ns":1769138733123000000,"eid":"e000009",
- "payload":{"step":2,"tool":"fs.read","args":{"rel_path":"notes.txt"},
-  "receipt":{"kind":"fs_read","read":["notes.txt"],"n_bytes":111},
-  "result":"q3 dates...","result_sha":"9f8b23c91a04c7d2",
-  "duration_ns":213900,"ok":true}}
-```
-
-Any reader you write is ten lines. That portability is a *feature*.
-
----
-
-## The cost model (how prefetch earns its keep)
-
-For each prediction the ledger stores the *real* numbers:
-
-- **saved_ms** — only on hits: the recorded `duration_ns` of the actual
-  call (the latency the agent would have waited; claim has provenance).
-- **wasted_ms** — only on misses (live mode): the real shadow-execution
-  time, measured, using the last-known args for that tool — so we measure
-  a plausible speculation, not a TypeError.
+## The cost model (one formula)
 
 ```
 net per workload  =  hit_rate × avg_real_ms   −   miss_rate × avg_shadow_ms
@@ -271,9 +524,22 @@ prefetch pays  ⇔  hit_rate / (1 − hit_rate)  >   avg_shadow_ms / avg_real_ms
 ```
 
 Every variable is in the ledger — compare predictors by the *same* math,
-keep speculative mode OFF until a workload's ratio clears the bar.
+keep speculative mode off until a workload's ratio clears the bar.
+Full accounting: [`docs/cost-model.md`](docs/cost-model.md).
 
----
+## Why "receipt" instead of "log"
+
+| | Log output | AFR trace |
+| --- | --- | --- |
+| What it stores | narrative text | typed events: prompt · verbatim response · tool intent · tool receipt |
+| Reproducible replay? | no | **yes** — deterministic walk, zero I/O |
+| What a tool touched | guess from stdout | **the receipt**: paths, byte counts, `existed_before` |
+| Diff two runs | eyeball both outputs | **alignment table**: same plan? which step drifted? |
+| Prove the trace wasn't edited | no | **hash chain** per line + file digest in the manifest |
+
+The mental model: an airplane's flight recorder doesn't narrate the flight.
+It records control inputs and sensor values at every tick — so afterwards
+you can *re-fly the sequence without the sky*.
 
 ## Honest limits (writing them down before someone asks)
 
@@ -292,29 +558,26 @@ keep speculative mode OFF until a workload's ratio clears the bar.
   are known**; with none, the ledger says `wasted_ms: 0` — an honest
   lower bound, flagged as such.
 
----
-
 ## Repo tour
 
 ```
-afr/                  the package (schema · recorder · replay · prefetch · diff · report · cli)
-tests/                73 tests: schema, store, recorder, replay, prefetch, diff, report, cli
-scripts/demo.py       the 8-step offline tour (idempotent — run it as often as you like)
+afr/                  the package (schema · store · recorder · replay · prefetch · diff · report · cli)
+tests/                80 tests: schema, store, recorder, replay, prefetch, diff, report, cli, scenarios
+scripts/demo.py       the 8-step offline tour (idempotent)
 examples/trace/       two committed recorded sessions + manifests
+examples/report-*.md  the generated markdown flight report (read it in any editor / GitHub)
 examples/report-*.html  the generated flight report (open in any browser)
 results/              both cost ledgers + the trained predictor
 docs/ARCHITECTURE.md  module-by-module design, invariants, and their prices
 docs/cost-model.md    the accounting, with measured demo numbers
 ```
 
----
-
 ## FAQ for skeptical engineers
 
 **Why not Slack it into LangSmith / AgentOps / Langfuse?**
 Those are hosted *telemetry* platforms: dashboards over emitted spans. AFR
 is a local-first *forensic format* — you own the file, `grep` wins,
-replaying never hits the network, and 73 tests run in CI on your machine
+replaying never hits the network, and 80 tests run in CI on your machine
 instead of an SDK contract in a vendor changelog. (Also: it's a library,
 not a purchase.)
 
@@ -327,21 +590,12 @@ publish both numbers.
 
 **Why Python 3.9+ and zero dependencies?**
 Because recorders get vendored into fragile agent hosts. Anywhere the
-agent runs, the six files of `afr/` will record. (Imports verified on
-3.9 and 3.12; CI matrix runs both on Ubuntu and Windows.)
-
-**What would make me star this repo?**
-You're an agent-framework author who just spent an evening replaying a
-mystery failure by hand. Add AFR, reply with `afr replay <id>` and a
-receipt table. Star after it saves you the second evening.
-
----
+agent runs, the files of `afr/` will record. (Verified on 3.9 and 3.12.)
 
 ## Roadmap
 
 1. **Provider shims** — OpenAI-compatible + MCP tool recorder so real agent
-   SDKs emit AFR-1 (schema is already reentrant: events are append-only,
-   payloads are opaque to the store).
+   SDKs emit AFR-1 (schema is already reentrant).
 2. **Shell receipts v2** — strace/ETW wrappers to name every file a
    command actually touched, reads included.
 3. **Prediction head v2** — same interface, small learned model; ledger
@@ -353,7 +607,7 @@ receipt table. Star after it saves you the second evening.
 
 ```powershell
 pip install -e ".[dev]"    # only pytest; runtime stays stdlib-only
-pytest tests               # 73 tests
+python -m pytest tests     # 80 tests
 python scripts/demo.py     # fresh artifacts every run
 ```
 

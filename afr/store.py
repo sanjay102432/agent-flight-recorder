@@ -67,12 +67,13 @@ class TraceStore:
                     old = json.load(f)
             except json.JSONDecodeError:
                 old = {}
-        if os.path.exists(self.trace_path) and self._count:
-            self._write_manifest(extra={
-                **old,
-                "events": self._count,
-                "resume_from": old.get("trace_content_hash") or self.read_last_chain_hash(),
-            })
+        # A reopen marks the resume point in the manifest -- but only when the
+        # store actually writes again. Read-only opens (replay/verify/diff view)
+        # must not touch the file at all: two concurrent readers, or a reader
+        # inside a writer's atomic swap, then never collide on Windows.
+        self._pending_resume = None
+        if self._count and old.get("trace_content_hash") != self.read_last_chain_hash():
+            self._pending_resume = old.get("trace_content_hash") or self.read_last_chain_hash()
 
     # -- ids -----------------------------------------------------------------
 
@@ -104,7 +105,11 @@ class TraceStore:
             f.write(line + "\n")
 
         self._count += 1
-        self._write_manifest(extra={"events": self._count})
+        extra: Dict[str, Any] = {"events": self._count}
+        if self._pending_resume is not None:
+            extra["resume_from"] = self._pending_resume
+            self._pending_resume = None
+        self._write_manifest(extra=extra)
         return ev.eid
 
     # -- reading -------------------------------------------------------------

@@ -1,11 +1,10 @@
 {
   "complete": true,
-  "created_utc": "2026-10-23T02:45:46",
+  "created_utc": "2026-10-25T11:17:57",
   "events": 24,
-  "resume_from": "9d874e93ce5e09e1",
   "schema": "AFR-1",
   "schema_version": 1,
-  "session_id": "20261023-024546-58a8",
+  "session_id": "20261025-111756-5911",
   "summary": {
     "counts": {
       "events": 23,
@@ -15,5 +14,5 @@
     "reason": "agent declared done",
     "steps": 0
   },
-  "trace_content_hash": "9d874e93ce5e09e1"
+  "trace_content_hash": "96fd051673a69604"
 }

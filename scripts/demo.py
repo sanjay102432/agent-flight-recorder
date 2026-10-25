@@ -4,9 +4,9 @@
 
 It records two agent sessions (planner, auditor) in ./examples/trace,
 replays them, prices prefetch in both offline and live modes, diffs the
-two plans, captures integrity verdicts, and writes the HTML flight
-report. Everything it prints is either a receipt, a lead-time number,
-or a diff -- deliberately no `trust me` sentences.
+two plans, captures integrity verdicts, and writes the flight report as
+markdown (examples/report-<session>.md) and HTML. Everything it prints is
+either a receipt, a lead-time number, or a diff -- no `trust me` sentences.
 """
 
 from __future__ import annotations
@@ -36,6 +36,7 @@ class Args:
         self.model_path = None
         self.out = None
         self.output = None
+        self.html = False
         self.open = False
         self.session = None
         self.session_a = None
@@ -110,12 +111,14 @@ def main() -> int:
     banner("7) diff: what changed between the two agent runs")
     cmd_diff(Args(store=store, session_a=a, session_b=b, json=True))
 
-    banner("8) view: the HTML flight report")
-    out = os.path.join(REPO, "examples", f"report-{a}.html")
-    cmd_view(Args(store=store, session=a, output=out, open_browser=False))
+    banner("8) view: the flight report (terminal + markdown; HTML on disk too)")
+    md_out = os.path.join(REPO, "examples", f"report-{a}.md")
+    html_out = os.path.join(REPO, "examples", f"report-{a}.html")
+    cmd_view(Args(store=store, session=a, output=md_out, html=True, open_browser=False))
 
-    banner(f"done in {time.perf_counter() - t0:.1f}s.  Open the report:")
-    print(f"    {out}")
+    banner(f"done in {time.perf_counter() - t0:.1f}s.  Reports written:")
+    print(f"    {md_out}")
+    print(f"    {html_out}")
     return 0
 
 
